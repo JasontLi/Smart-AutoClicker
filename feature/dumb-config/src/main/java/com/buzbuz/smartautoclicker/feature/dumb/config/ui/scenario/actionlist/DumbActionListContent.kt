@@ -66,6 +66,9 @@ class DumbActionListContent(appContext: Context) : NavBarDialogContent(appContex
 
     private lateinit var operationSwitch: com.google.android.material.materialswitch.MaterialSwitch
     private var bookmarks: List<EditBookmark> = emptyList()
+    private val entryJump = BookmarkEntryJump()
+    private var actionsReady = false
+    private var bookmarksReady = false
     private var pendingJump: Long? = null
     private var highlightJob: Job? = null
 
@@ -130,6 +133,8 @@ class DumbActionListContent(appContext: Context) : NavBarDialogContent(appContex
                 launch { viewModel.operationDisplayEnabled.collect { operationSwitch.isChecked = it } }
                 launch { viewModel.bookmarks.collect {
                     bookmarks = it
+                    bookmarksReady = true
+                    maybeJumpOnEntry()
                     dumbActionsAdapter.updateBookmarks(it.map { bookmark -> bookmark.actionId }.toSet())
                 } }
             }
@@ -168,7 +173,11 @@ class DumbActionListContent(appContext: Context) : NavBarDialogContent(appContex
 
     private fun updateDumbActionList(newList: List<DumbActionDetails>) {
         viewBinding.updateState(newList)
-        dumbActionsAdapter.submitList(newList) { performPendingJump() }
+        dumbActionsAdapter.submitList(newList) {
+            actionsReady = true
+            maybeJumpOnEntry()
+            performPendingJump()
+        }
     }
 
     private fun notify(message: Int) = Toast.makeText(context, message, Toast.LENGTH_LONG).show()
@@ -209,10 +218,6 @@ class DumbActionListContent(appContext: Context) : NavBarDialogContent(appContex
 
     private fun showBookmarks(manage: Boolean = false) {
         val snapshot = bookmarks
-        if (snapshot.isEmpty()) {
-            notify(R.string.edit_bookmark_empty)
-            return
-        }
         val entries = snapshot.map { bookmark ->
             val index = targetIndex(bookmark.actionId)
             val location = if (index < 0) context.getString(R.string.edit_bookmark_missing)
@@ -222,6 +227,12 @@ class DumbActionListContent(appContext: Context) : NavBarDialogContent(appContex
         open(EditBookmarkDialog(
             title = context.getString(R.string.edit_bookmarks),
             entries = entries,
+            toggleLabel = context.getString(R.string.edit_bookmark_auto_jump),
+            toggleChecked = viewModel.autoJumpEnabled.value,
+            onToggle = { enabled ->
+                viewModel.setAutoJumpEnabled(enabled)
+                if (enabled) { entryJump.reset(); maybeJumpOnEntry() }
+            },
             secondaryLabel = if (manage) null else context.getString(R.string.edit_bookmark_manage),
             onSecondary = { showBookmarks(manage = true) },
             onSelected = { index ->
@@ -259,6 +270,22 @@ class DumbActionListContent(appContext: Context) : NavBarDialogContent(appContex
                 }
             }
         }
+    }
+
+    override fun onStop() {
+        actionsReady = false
+        bookmarksReady = false
+        pendingJump = null
+        entryJump.reset()
+        super.onStop()
+    }
+
+    private fun maybeJumpOnEntry() {
+        if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return
+        val id = entryJump.target(viewModel.autoJumpEnabled.value, actionsReady,
+            if (bookmarksReady) bookmarks else null) ?: return
+        pendingJump = id
+        performPendingJump()
     }
 
     private fun performPendingJump() {

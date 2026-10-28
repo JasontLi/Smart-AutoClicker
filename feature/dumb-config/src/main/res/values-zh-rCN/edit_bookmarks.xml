@@ -12,4 +12,5 @@
     <string name="edit_bookmark_write_failed">书签修改保存失败，请重试。</string>
     <string name="edit_bookmark_position">第 %1$d 个动作 · %2$s</string>
     <string name="edit_bookmark_manage">管理书签</string>
+    <string name="edit_bookmark_auto_jump">进入操作页自动跳转到最后添加的书签</string>
 </resources>

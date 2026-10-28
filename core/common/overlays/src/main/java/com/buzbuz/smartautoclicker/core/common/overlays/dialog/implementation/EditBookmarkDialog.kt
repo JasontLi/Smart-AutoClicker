@@ -1,5 +1,6 @@
 package com.buzbuz.smartautoclicker.core.common.overlays.dialog.implementation
 
+import com.google.android.material.materialswitch.MaterialSwitch
 import android.text.InputFilter
 import android.view.KeyEvent
 import androidx.appcompat.app.AlertDialog
@@ -21,6 +22,9 @@ class EditBookmarkDialog(
     private val onName: (String) -> Unit = {},
     private val secondaryLabel: String? = null,
     private val onSecondary: () -> Unit = {},
+    private val toggleLabel: String? = null,
+    private var toggleChecked: Boolean = false,
+    private val onToggle: (Boolean) -> Unit = {},
 ) : BaseOverlay(R.style.AppTheme, recreateOnRotation = true) {
     private var dialog: AlertDialog? = null
 
@@ -35,6 +39,15 @@ class EditBookmarkDialog(
                 } else false
             }
         if (secondaryLabel != null) builder.setNeutralButton(secondaryLabel) { _, _ -> back(); onSecondary() }
+        if (toggleLabel != null) {
+            builder.setView(MaterialSwitch(context).apply {
+                text = toggleLabel
+                val padding = (24 * resources.displayMetrics.density).toInt()
+                setPadding(padding, padding / 2, padding, padding / 2)
+                isChecked = toggleChecked
+                setOnCheckedChangeListener { _, checked -> toggleChecked = checked; onToggle(checked) }
+            })
+        }
         if (entries != null) {
             builder.setItems(entries.toTypedArray()) { _, index -> back(); onSelected(index) }
         } else {

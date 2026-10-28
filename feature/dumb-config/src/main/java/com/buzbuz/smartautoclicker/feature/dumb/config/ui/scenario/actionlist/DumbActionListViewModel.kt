@@ -47,6 +47,9 @@ class DumbActionListViewModel @Inject constructor(
     private val operationDisplay: DumbOperationDisplay,
 ) : ViewModel() {
 
+    val autoJumpEnabled = bookmarkStore.autoJumpEnabled
+    fun setAutoJumpEnabled(enabled: Boolean) = bookmarkStore.setAutoJumpEnabled(enabled)
+
     val operationDisplayEnabled = operationDisplay.enabled
     fun setOperationDisplayEnabled(enabled: Boolean) = operationDisplay.setEnabled(enabled)
 

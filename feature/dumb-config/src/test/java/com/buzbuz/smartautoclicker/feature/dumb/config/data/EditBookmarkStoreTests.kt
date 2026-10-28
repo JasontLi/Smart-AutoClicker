@@ -75,6 +75,18 @@ class EditBookmarkStoreTests {
         assertEquals(-1, store.read(1).single().findTarget(2, listOf(action(50, 2))))
     }
 
+    @Test fun autoJumpDefaultsOnAndUserPreferencePersistsWithoutChangingBookmarks() = runBlocking {
+        val store = EditBookmarkStore(context)
+        store.add(1, 35, "Original")
+        val before = store.read(1)
+        assertTrue(store.autoJumpEnabled.value)
+        store.setAutoJumpEnabled(false)
+        assertFalse(EditBookmarkStore(context).autoJumpEnabled.value)
+        assertEquals(before, store.read(1))
+        store.setAutoJumpEnabled(true)
+        assertTrue(EditBookmarkStore(context).autoJumpEnabled.value)
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun temporaryIdsCannotBePersisted() { runBlocking { EditBookmarkStore(context).add(1, 0, "Temporary") } }
 }

@@ -6,6 +6,8 @@ import com.buzbuz.smartautoclicker.core.dumb.domain.model.DumbAction
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.sync.Mutex
@@ -28,6 +30,14 @@ internal fun EditBookmark.findTarget(scenarioId: Long, actions: List<DumbAction>
 class EditBookmarkStore @Inject constructor(@ApplicationContext context: Context) {
     private val preferences = context.getSharedPreferences("DumbEditBookmarks", Context.MODE_PRIVATE)
     private val mutex = Mutex()
+    private val _autoJumpEnabled = MutableStateFlow(preferences.getBoolean("auto_jump_enabled", true))
+    val autoJumpEnabled: StateFlow<Boolean> = _autoJumpEnabled
+
+    fun setAutoJumpEnabled(enabled: Boolean) {
+        preferences.edit().putBoolean("auto_jump_enabled", enabled).apply()
+        _autoJumpEnabled.value = enabled
+    }
+
 
     fun observe(scenarioId: Long): Flow<List<EditBookmark>> = callbackFlow {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, changed ->
