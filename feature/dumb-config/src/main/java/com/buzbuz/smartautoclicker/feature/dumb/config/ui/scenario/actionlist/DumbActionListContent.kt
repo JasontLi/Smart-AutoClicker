@@ -204,6 +204,12 @@ class DumbActionListContent(appContext: Context) : NavBarDialogContent(appContex
                 notify(R.string.edit_bookmark_unsaved)
                 return@debounceUserInteraction
             }
+            if (bookmarks.any { it.actionId == details.action.id.databaseId }) {
+                lifecycleScope.launch {
+                    if (!viewModel.deleteBookmarksForAction(details.action)) notify(R.string.edit_bookmark_write_failed)
+                }
+                return@debounceUserInteraction
+            }
             editName(R.string.edit_bookmark_add, details.name) { name ->
                 viewModel.addBookmark(details.action, name)
             }

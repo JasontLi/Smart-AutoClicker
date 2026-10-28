@@ -58,7 +58,10 @@ class EditBookmarkStore @Inject constructor(@ApplicationContext context: Context
 
     suspend fun add(scenarioId: Long, actionId: Long, name: String): Boolean {
         require(scenarioId > 0 && actionId > 0 && name.isNotBlank())
-        return update(scenarioId) { it + EditBookmark(UUID.randomUUID().toString(), actionId, name.trim()) }
+        return update(scenarioId) { bookmarks ->
+            if (bookmarks.any { it.actionId == actionId }) bookmarks
+            else bookmarks + EditBookmark(UUID.randomUUID().toString(), actionId, name.trim())
+        }
     }
 
     suspend fun rename(scenarioId: Long, id: String, name: String): Boolean {
@@ -68,6 +71,10 @@ class EditBookmarkStore @Inject constructor(@ApplicationContext context: Context
 
     suspend fun delete(scenarioId: Long, id: String): Boolean =
         update(scenarioId) { it.filterNot { bookmark -> bookmark.id == id } }
+
+    /** Clears every bookmark for the action, including duplicates saved by older versions. */
+    suspend fun deleteForAction(scenarioId: Long, actionId: Long): Boolean =
+        update(scenarioId) { it.filterNot { bookmark -> bookmark.actionId == actionId } }
 
     suspend fun retarget(scenarioId: Long, id: String, actionId: Long): Boolean {
         require(actionId > 0)

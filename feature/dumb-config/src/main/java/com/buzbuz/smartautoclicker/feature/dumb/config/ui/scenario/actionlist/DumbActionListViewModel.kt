@@ -77,6 +77,11 @@ class DumbActionListViewModel @Inject constructor(
         return bookmarkStore.add(action.scenarioId.databaseId, action.id.databaseId, name)
     }
 
+    suspend fun deleteBookmarksForAction(action: DumbAction): Boolean {
+        if (!canBookmark(action)) return false
+        return bookmarkStore.deleteForAction(action.scenarioId.databaseId, action.id.databaseId)
+    }
+
     suspend fun renameBookmark(bookmark: EditBookmark, name: String): Boolean =
         userModifications.value?.let { bookmarkStore.rename(it.id.databaseId, bookmark.id, name) } ?: false
 

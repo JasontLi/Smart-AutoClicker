@@ -87,6 +87,28 @@ class EditBookmarkStoreTests {
         assertTrue(EditBookmarkStore(context).autoJumpEnabled.value)
     }
 
+    @Test fun repeatedAddDoesNotDuplicateOrRenameExistingBookmark() = runBlocking {
+        val store = EditBookmarkStore(context)
+        store.add(1, 35, "Original")
+        val before = store.read(1)
+        assertTrue(store.add(1, 35, "Duplicate"))
+        assertEquals(before, EditBookmarkStore(context).read(1))
+    }
+
+    @Test fun removeActionBookmarksClearsLegacyDuplicatesAndAllowsAddingAgain() = runBlocking {
+        val store = EditBookmarkStore(context)
+        store.add(1, 35, "First")
+        store.add(1, 40, "Other action")
+        store.add(1, 50, "Legacy duplicate")
+        store.retarget(1, store.read(1).last().id, 35)
+        store.add(2, 35, "Other scenario")
+        assertTrue(store.deleteForAction(1, 35))
+        assertEquals(listOf(40L), EditBookmarkStore(context).read(1).map { it.actionId })
+        assertEquals("Other scenario", store.read(2).single().name)
+        assertTrue(store.add(1, 35, "Added again"))
+        assertEquals(listOf(40L, 35L), store.read(1).map { it.actionId })
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun temporaryIdsCannotBePersisted() { runBlocking { EditBookmarkStore(context).add(1, 0, "Temporary") } }
 }

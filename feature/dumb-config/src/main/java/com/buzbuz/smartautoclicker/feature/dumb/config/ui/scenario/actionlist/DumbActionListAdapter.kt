@@ -130,7 +130,7 @@ class DumbActionViewHolder(private val viewBinding: ItemDumbActionBinding) : Rec
         viewBinding.editBookmark.apply {
             visibility = View.VISIBLE
             setImageResource(if (bookmarked) R.drawable.ic_edit_bookmark_filled else R.drawable.ic_edit_bookmark_outline)
-            contentDescription = context.getString(if (bookmarked) R.string.edit_bookmarks else R.string.edit_bookmark_add)
+            contentDescription = context.getString(if (bookmarked) R.string.edit_bookmark_delete else R.string.edit_bookmark_add)
             setOnClickListener { onClick() }
         }
     }
