@@ -16,6 +16,7 @@
  */
 package com.buzbuz.smartautoclicker.feature.dumb.config.ui
 
+import com.buzbuz.smartautoclicker.core.dumb.engine.DumbOperationDisplay
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 
@@ -39,7 +40,10 @@ class DumbMainMenuModel @Inject constructor(
     private val dumbEditionRepository: DumbEditionRepository,
     private val dumbEngine: DumbEngine,
     tutorialRepository: TutorialRepository,
+    operationDisplay: DumbOperationDisplay,
 ) : ViewModel() {
+
+    val operationTrace = operationDisplay.trace
 
     val canPlay: Flow<Boolean> =
         combine(dumbEditionRepository.isEditionSynchronized, dumbEngine.dumbScenario) { isSync, scenario ->

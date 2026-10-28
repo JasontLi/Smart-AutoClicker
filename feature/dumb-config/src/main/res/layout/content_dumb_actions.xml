@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/edit_bookmarks" style="?attr/borderlessButtonStyle"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="@string/edit_bookmarks" />
+    <com.google.android.material.materialswitch.MaterialSwitch
+        android:id="@+id/show_operation_traces"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:text="@string/show_operation_traces" />
+    <include android:id="@+id/action_list" layout="@layout/include_loadable_list"
+        android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" />
+</LinearLayout>

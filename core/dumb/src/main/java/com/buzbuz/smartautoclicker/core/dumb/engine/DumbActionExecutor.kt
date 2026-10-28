@@ -34,6 +34,7 @@ import kotlin.time.Duration.Companion.milliseconds
 @Singleton
 class DumbActionExecutor @Inject constructor(
     private val androidExecutor: AndroidActionExecutor,
+    private val operationDisplay: DumbOperationDisplay,
 ) {
 
     private val random: Random = Random(System.currentTimeMillis())
@@ -84,7 +85,12 @@ class DumbActionExecutor @Inject constructor(
 
         repeatable.repeat {
             withContext(Dispatchers.Main) {
-                androidExecutor.dispatchBuiltGesture(builtGesture)
+                val trace = operationDisplay.begin(builtGesture)
+                try {
+                    androidExecutor.dispatchBuiltGesture(builtGesture)
+                } finally {
+                    operationDisplay.end(trace)
+                }
             }
         }
     }

@@ -16,6 +16,7 @@
  */
 package com.buzbuz.smartautoclicker.feature.dumb.config.ui.scenario.actionlist
 
+import com.buzbuz.smartautoclicker.core.dumb.engine.DumbOperationDisplay
 import android.content.Context
 import android.graphics.Point
 import androidx.lifecycle.ViewModel
@@ -27,15 +28,27 @@ import com.buzbuz.smartautoclicker.feature.dumb.config.ui.actions.copy.DumbActio
 import com.buzbuz.smartautoclicker.feature.dumb.config.ui.actions.copy.toDumbActionDetails
 
 import dagger.hilt.android.qualifiers.ApplicationContext
+import com.buzbuz.smartautoclicker.feature.dumb.config.data.EditBookmark
+import com.buzbuz.smartautoclicker.feature.dumb.config.data.EditBookmarkStore
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class DumbActionListViewModel @Inject constructor(
     @ApplicationContext context: Context,
     private val dumbEditionRepository: DumbEditionRepository,
+    private val bookmarkStore: EditBookmarkStore,
+    private val operationDisplay: DumbOperationDisplay,
 ) : ViewModel() {
+
+    val operationDisplayEnabled = operationDisplay.enabled
+    fun setOperationDisplayEnabled(enabled: Boolean) = operationDisplay.setEnabled(enabled)
 
     private val userModifications: StateFlow<DumbScenario?> =
         dumbEditionRepository.editedDumbScenario
@@ -45,6 +58,32 @@ class DumbActionListViewModel @Inject constructor(
         .map { dumbScenario ->
             dumbScenario?.dumbActions?.map { it.toDumbActionDetails(context) } ?: emptyList()
         }
+
+    val bookmarks: Flow<List<EditBookmark>> = userModifications
+        .map { it?.id?.databaseId }
+        .distinctUntilChanged()
+        .flatMapLatest { id -> if (id != null && id > 0) bookmarkStore.observe(id) else flowOf(emptyList()) }
+
+    fun canBookmark(action: DumbAction): Boolean = userModifications.value?.let { scenario ->
+        scenario.id.isInDatabase() && action.id.isInDatabase() && action.scenarioId == scenario.id &&
+            scenario.dumbActions.any { it.id == action.id }
+    } == true
+
+    suspend fun addBookmark(action: DumbAction, name: String): Boolean {
+        if (!canBookmark(action)) return false
+        return bookmarkStore.add(action.scenarioId.databaseId, action.id.databaseId, name)
+    }
+
+    suspend fun renameBookmark(bookmark: EditBookmark, name: String): Boolean =
+        userModifications.value?.let { bookmarkStore.rename(it.id.databaseId, bookmark.id, name) } ?: false
+
+    suspend fun deleteBookmark(bookmark: EditBookmark): Boolean =
+        userModifications.value?.let { bookmarkStore.delete(it.id.databaseId, bookmark.id) } ?: false
+
+    suspend fun retargetBookmark(bookmark: EditBookmark, action: DumbAction): Boolean {
+        if (!canBookmark(action)) return false
+        return bookmarkStore.retarget(action.scenarioId.databaseId, bookmark.id, action.id.databaseId)
+    }
 
     val canCopyAction: Flow<Boolean> = dumbEditionRepository.actionsToCopy
         .map { it.isNotEmpty() }

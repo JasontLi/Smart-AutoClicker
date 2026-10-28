@@ -1,0 +1,15 @@
+<resources>
+    <string name="edit_bookmarks">Edit bookmarks</string>
+    <string name="edit_bookmark_add">Add edit bookmark</string>
+    <string name="edit_bookmark_name">Bookmark name</string>
+    <string name="edit_bookmark_rename">Rename bookmark</string>
+    <string name="edit_bookmark_delete">Delete bookmark</string>
+    <string name="edit_bookmark_jump">Jump to action</string>
+    <string name="edit_bookmark_retarget">Choose a different action</string>
+    <string name="edit_bookmark_empty">No edit bookmarks yet. Use the bookmark button beside an action.</string>
+    <string name="edit_bookmark_unsaved">Save the scenario and reopen its editor before bookmarking a new action.</string>
+    <string name="edit_bookmark_missing">Target action deleted or unavailable</string>
+    <string name="edit_bookmark_write_failed">Could not save bookmark changes. Please try again.</string>
+    <string name="edit_bookmark_position">Action %1$d · %2$s</string>
+    <string name="edit_bookmark_manage">Manage bookmarks</string>
+</resources>

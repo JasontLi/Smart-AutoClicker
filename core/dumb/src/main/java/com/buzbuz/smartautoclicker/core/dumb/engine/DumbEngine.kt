@@ -50,6 +50,7 @@ import javax.inject.Singleton
 class DumbEngine @Inject constructor(
     private val dumbRepository: IDumbRepository,
     private val dumbActionExecutor: DumbActionExecutor,
+    private val operationDisplay: DumbOperationDisplay,
     private val settingsRepository: SettingsRepository
 ): Dumpable {
 
@@ -73,6 +74,7 @@ class DumbEngine @Inject constructor(
     val isRunning: StateFlow<Boolean> = _isRunning
 
     fun init(dumbScenario: DumbScenario) {
+        operationDisplay.clear()
         dumbActionExecutor.setUnblockWorkaround(settingsRepository.isInputBlockWorkaroundEnabled())
         dumbScenarioDbId.value = dumbScenario.id.databaseId
 
@@ -103,6 +105,7 @@ class DumbEngine @Inject constructor(
     fun stopDumbScenario() {
         if (!isRunning.value) return
         _isRunning.value = false
+        operationDisplay.clear()
 
         Log.d(TAG, "stopDumbScenario")
 

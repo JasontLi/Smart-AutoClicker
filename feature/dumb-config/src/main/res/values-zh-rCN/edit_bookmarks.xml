@@ -1,0 +1,15 @@
+<resources>
+    <string name="edit_bookmarks">编辑书签</string>
+    <string name="edit_bookmark_add">添加编辑书签</string>
+    <string name="edit_bookmark_name">书签名称</string>
+    <string name="edit_bookmark_rename">重命名书签</string>
+    <string name="edit_bookmark_delete">删除书签</string>
+    <string name="edit_bookmark_jump">跳转到动作</string>
+    <string name="edit_bookmark_retarget">重新选择目标动作</string>
+    <string name="edit_bookmark_empty">暂无编辑书签，请点击动作旁的书签按钮添加。</string>
+    <string name="edit_bookmark_unsaved">请先保存场景并重新打开编辑器，再为新动作添加书签。</string>
+    <string name="edit_bookmark_missing">目标动作已删除或不可用</string>
+    <string name="edit_bookmark_write_failed">书签修改保存失败，请重试。</string>
+    <string name="edit_bookmark_position">第 %1$d 个动作 · %2$s</string>
+    <string name="edit_bookmark_manage">管理书签</string>
+</resources>

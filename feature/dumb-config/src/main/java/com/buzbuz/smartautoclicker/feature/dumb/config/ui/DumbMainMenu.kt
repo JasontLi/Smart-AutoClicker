@@ -64,6 +64,8 @@ class DumbMainMenu(
      * Tells if this service has handled onKeyEvent with ACTION_DOWN for a key in order to return
      * the correct value when ACTION_UP is received.
      */
+    private var operationOverlay: DumbOperationTraceOverlay? = null
+
     private var keyDownHandled: Boolean = false
 
     override fun onCreate() {
@@ -73,6 +75,9 @@ class DumbMainMenu(
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.isPlaying.collect(::updateMenuPlayingState) }
                 launch { viewModel.canPlay.collect(::updatePlayPauseButtonEnabledState) }
+                launch { viewModel.operationTrace.collect { trace ->
+                    if (viewModel.isPlaying.value) operationOverlay?.show(trace)
+                } }
             }
         }
     }
@@ -90,10 +95,18 @@ class DumbMainMenu(
             playPauseButtonController.attachView(btnPlay)
         }
 
+        operationOverlay = DumbOperationTraceOverlay(context)
         return viewBinding.root
     }
 
+    override fun onStop() {
+        operationOverlay?.close()
+        super.onStop()
+    }
+
     override fun onDestroy() {
+        operationOverlay?.close()
+        operationOverlay = null
         super.onDestroy()
         playPauseButtonController.detachView()
         viewModel.stopEdition()
@@ -126,6 +139,7 @@ class DumbMainMenu(
         setMenuItemViewEnabled(viewBinding.btnPlay, canStartDetection)
 
     private fun updateMenuPlayingState(isPlaying: Boolean) {
+        if (!isPlaying) operationOverlay?.show(null)
         val currentState = viewBinding.btnPlay.tag
         if (currentState == isPlaying) return
 

@@ -16,7 +16,13 @@
  */
 package com.buzbuz.smartautoclicker.feature.dumb.config.ui.scenario.actionlist
 
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.StateListDrawable
+import com.google.android.material.color.MaterialColors
+import android.view.View
 import android.view.LayoutInflater
+import com.buzbuz.smartautoclicker.feature.dumb.config.R
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 
@@ -33,13 +39,37 @@ import java.util.Collections
 class DumbActionListAdapter(
     private val actionClickedListener: (DumbActionDetails) -> Unit,
     private val actionReorderListener: (List<DumbActionDetails>) -> Unit,
+    private val bookmarkClickedListener: (DumbActionDetails) -> Unit,
 ) : ListAdapter<DumbActionDetails, DumbActionViewHolder>(DumbActionDiffUtilCallback) {
+
+    private var bookmarkedIds: Set<Long> = emptySet()
+    private var highlightedId: Long? = null
+
+    fun updateBookmarks(ids: Set<Long>) {
+        val changed = bookmarkedIds union ids
+        bookmarkedIds = ids
+        currentList.forEachIndexed { index, item ->
+            if (item.action.id.databaseId in changed) notifyItemChanged(index)
+        }
+    }
+
+    fun highlight(id: Long?) {
+        val oldId = highlightedId
+        highlightedId = id
+        currentList.forEachIndexed { index, item ->
+            if (item.action.id.databaseId == oldId || item.action.id.databaseId == id) notifyItemChanged(index)
+        }
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): DumbActionViewHolder =
         DumbActionViewHolder(ItemDumbActionBinding.inflate(LayoutInflater.from(parent.context), parent, false))
 
     override fun onBindViewHolder(holder: DumbActionViewHolder, position: Int) {
-        holder.onBind(getItem(position), actionClickedListener)
+        val item = getItem(position)
+        holder.onBind(item, actionClickedListener)
+        holder.bindBookmark(item.action.id.databaseId in bookmarkedIds, item.action.id.databaseId == highlightedId) {
+            bookmarkClickedListener(item)
+        }
     }
 
     /**
@@ -86,6 +116,25 @@ class DumbActionViewHolder(private val viewBinding: ItemDumbActionBinding) : Rec
      * @param details the action to be represented by this item.
      * @param actionClickedListener listener notified upon user click on this item.
      */
+    fun bindBookmark(bookmarked: Boolean, highlighted: Boolean, onClick: () -> Unit) {
+        // Resolve Material colors with the row's theme before constructing the drawable.
+        // A selector containing ?attr drawables can be inflated without a theme by Resources.
+        viewBinding.root.background = StateListDrawable().apply {
+            addState(
+                intArrayOf(android.R.attr.state_activated),
+                ColorDrawable(MaterialColors.getColor(viewBinding.root, R.attr.colorSecondaryContainer)),
+            )
+            addState(intArrayOf(), ColorDrawable(Color.TRANSPARENT))
+        }
+        viewBinding.root.isActivated = highlighted
+        viewBinding.editBookmark.apply {
+            visibility = View.VISIBLE
+            setImageResource(if (bookmarked) R.drawable.ic_edit_bookmark_filled else R.drawable.ic_edit_bookmark_outline)
+            contentDescription = context.getString(if (bookmarked) R.string.edit_bookmarks else R.string.edit_bookmark_add)
+            setOnClickListener { onClick() }
+        }
+    }
+
     fun onBind(details: DumbActionDetails, actionClickedListener: (DumbActionDetails) -> Unit) {
         viewBinding.onBind(details, true, actionClickedListener)
     }

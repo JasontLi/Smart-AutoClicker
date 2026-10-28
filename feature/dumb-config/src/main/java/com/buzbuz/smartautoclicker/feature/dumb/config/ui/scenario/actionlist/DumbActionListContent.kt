@@ -17,6 +17,15 @@
 package com.buzbuz.smartautoclicker.feature.dumb.config.ui.scenario.actionlist
 
 import android.content.Context
+import android.widget.Toast
+import com.buzbuz.smartautoclicker.core.common.overlays.dialog.implementation.EditBookmarkDialog
+import androidx.core.view.doOnNextLayout
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.buzbuz.smartautoclicker.feature.dumb.config.data.EditBookmark
+import com.buzbuz.smartautoclicker.feature.dumb.config.data.findTarget
+import com.buzbuz.smartautoclicker.feature.dumb.config.databinding.ContentDumbActionsBinding
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import android.view.LayoutInflater
 import android.view.ViewGroup
 
@@ -55,6 +64,11 @@ class DumbActionListContent(appContext: Context) : NavBarDialogContent(appContex
     /** Adapter for the list of actions. */
     private lateinit var dumbActionsAdapter: DumbActionListAdapter
 
+    private lateinit var operationSwitch: com.google.android.material.materialswitch.MaterialSwitch
+    private var bookmarks: List<EditBookmark> = emptyList()
+    private var pendingJump: Long? = null
+    private var highlightJob: Job? = null
+
     private lateinit var createCopyActionUiFlowListener: DumbActionUiFlowListener
     private lateinit var updateActionUiFlowListener: DumbActionUiFlowListener
     private lateinit var dumbActionCreator: DumbActionCreator
@@ -68,9 +82,15 @@ class DumbActionListContent(appContext: Context) : NavBarDialogContent(appContex
         dumbActionsAdapter = DumbActionListAdapter(
             actionClickedListener = ::onDumbActionClicked,
             actionReorderListener = viewModel::updateDumbActionOrder,
+            bookmarkClickedListener = ::onBookmarkClicked,
         )
 
-        viewBinding = IncludeLoadableListBinding.inflate(LayoutInflater.from(context), container, false).apply {
+        val content = ContentDumbActionsBinding.inflate(LayoutInflater.from(context), container, false)
+        operationSwitch = content.showOperationTraces
+        operationSwitch.isChecked = viewModel.operationDisplayEnabled.value
+        operationSwitch.setOnCheckedChangeListener { _, checked -> viewModel.setOperationDisplayEnabled(checked) }
+        content.editBookmarks.setOnClickListener { debounceUserInteraction { showBookmarks() } }
+        viewBinding = content.actionList.apply {
             setEmptyText(
                 id = R.string.message_empty_dumb_action_list,
                 secondaryId = R.string.message_empty_secondary_dumb_action_list,
@@ -82,7 +102,7 @@ class DumbActionListContent(appContext: Context) : NavBarDialogContent(appContex
             }
         }
 
-        return viewBinding.root
+        return content.root
     }
 
     override fun onViewCreated() {
@@ -107,6 +127,11 @@ class DumbActionListContent(appContext: Context) : NavBarDialogContent(appContex
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch { viewModel.dumbActionsDetails.collect(::updateDumbActionList) }
                 launch { viewModel.canCopyAction.collect(::updateCopyButtonState) }
+                launch { viewModel.operationDisplayEnabled.collect { operationSwitch.isChecked = it } }
+                launch { viewModel.bookmarks.collect {
+                    bookmarks = it
+                    dumbActionsAdapter.updateBookmarks(it.map { bookmark -> bookmark.actionId }.toSet())
+                } }
             }
         }
     }
@@ -143,7 +168,124 @@ class DumbActionListContent(appContext: Context) : NavBarDialogContent(appContex
 
     private fun updateDumbActionList(newList: List<DumbActionDetails>) {
         viewBinding.updateState(newList)
-        dumbActionsAdapter.submitList(newList)
+        dumbActionsAdapter.submitList(newList) { performPendingJump() }
+    }
+
+    private fun notify(message: Int) = Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+
+    private fun open(dialog: EditBookmarkDialog) {
+        dialogController.overlayManager.navigateTo(context, dialog)
+    }
+
+    private fun choose(title: String, entries: List<String>, selected: (Int) -> Unit) {
+        open(EditBookmarkDialog(title = title, entries = entries, onSelected = selected))
+    }
+
+    private fun editName(title: Int, initial: String, save: suspend (String) -> Boolean) {
+        open(EditBookmarkDialog(title = context.getString(title), nameLabel = context.getString(R.string.edit_bookmark_name), editedName = initial, onName = { name ->
+            lifecycleScope.launch {
+                if (!save(name)) notify(R.string.edit_bookmark_write_failed)
+            }
+        }))
+    }
+
+    private fun onBookmarkClicked(details: DumbActionDetails) {
+        debounceUserInteraction {
+            if (!viewModel.canBookmark(details.action)) {
+                notify(R.string.edit_bookmark_unsaved)
+                return@debounceUserInteraction
+            }
+            editName(R.string.edit_bookmark_add, details.name) { name ->
+                viewModel.addBookmark(details.action, name)
+            }
+        }
+    }
+
+    private fun targetIndex(id: Long): Int {
+        val actions = dumbActionsAdapter.currentList.map { it.action }
+        val scenarioId = actions.firstOrNull()?.scenarioId?.databaseId ?: return -1
+        return EditBookmark("", id, "").findTarget(scenarioId, actions)
+    }
+
+    private fun showBookmarks(manage: Boolean = false) {
+        val snapshot = bookmarks
+        if (snapshot.isEmpty()) {
+            notify(R.string.edit_bookmark_empty)
+            return
+        }
+        val entries = snapshot.map { bookmark ->
+            val index = targetIndex(bookmark.actionId)
+            val location = if (index < 0) context.getString(R.string.edit_bookmark_missing)
+                else context.getString(R.string.edit_bookmark_position, index + 1, dumbActionsAdapter.currentList[index].name)
+            "${bookmark.name}\n$location"
+        }
+        open(EditBookmarkDialog(
+            title = context.getString(R.string.edit_bookmarks),
+            entries = entries,
+            secondaryLabel = if (manage) null else context.getString(R.string.edit_bookmark_manage),
+            onSecondary = { showBookmarks(manage = true) },
+            onSelected = { index ->
+                val bookmark = snapshot[index]
+                if (manage || targetIndex(bookmark.actionId) < 0) showBookmarkOptions(bookmark)
+                else { pendingJump = bookmark.actionId; performPendingJump() }
+            },
+        ))
+    }
+
+    private fun showBookmarkOptions(bookmark: EditBookmark) {
+        val valid = targetIndex(bookmark.actionId) >= 0
+        val options = mutableListOf<Int>()
+        if (valid) options.add(R.string.edit_bookmark_jump)
+        options.addAll(listOf(R.string.edit_bookmark_rename, R.string.edit_bookmark_delete, R.string.edit_bookmark_retarget))
+        val title = if (valid) bookmark.name else "${bookmark.name} · ${context.getString(R.string.edit_bookmark_missing)}"
+        choose(title, options.map(context::getString)) { index ->
+            when (options[index]) {
+                R.string.edit_bookmark_jump -> { pendingJump = bookmark.actionId; performPendingJump() }
+                R.string.edit_bookmark_rename -> editName(R.string.edit_bookmark_rename, bookmark.name) {
+                    viewModel.renameBookmark(bookmark, it)
+                }
+                R.string.edit_bookmark_delete -> lifecycleScope.launch {
+                    if (!viewModel.deleteBookmark(bookmark)) notify(R.string.edit_bookmark_write_failed)
+                }
+                R.string.edit_bookmark_retarget -> {
+                    val actions = dumbActionsAdapter.currentList.filter { viewModel.canBookmark(it.action) }
+                    if (actions.isEmpty()) {
+                        notify(R.string.edit_bookmark_unsaved)
+                    } else choose(context.getString(R.string.edit_bookmark_retarget), actions.map {
+                        context.getString(R.string.edit_bookmark_position, targetIndex(it.action.id.databaseId) + 1, it.name)
+                    }) { selected -> lifecycleScope.launch {
+                        if (!viewModel.retargetBookmark(bookmark, actions[selected].action)) notify(R.string.edit_bookmark_write_failed)
+                    } }
+                }
+            }
+        }
+    }
+
+    private fun performPendingJump() {
+        val actionId = pendingJump ?: return
+        val list = viewBinding.list
+        list.post {
+            if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) || pendingJump != actionId) return@post
+            val index = targetIndex(actionId)
+            if (index < 0) {
+                pendingJump = null
+                notify(R.string.edit_bookmark_missing)
+                return@post
+            }
+            val manager = list.layoutManager as? LinearLayoutManager ?: return@post
+            list.doOnNextLayout {
+                if (pendingJump != actionId) return@doOnNextLayout
+                pendingJump = null
+                highlightJob?.cancel()
+                dumbActionsAdapter.highlight(actionId)
+                highlightJob = lifecycleScope.launch {
+                    delay(1800)
+                    dumbActionsAdapter.highlight(null)
+                }
+            }
+            manager.scrollToPositionWithOffset(index, list.paddingTop)
+            list.requestLayout()
+        }
     }
 
     private fun updateCopyButtonState(enabled: Boolean) {
